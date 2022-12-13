@@ -19,12 +19,20 @@ fn main() {
         .read_line(&mut input_buffer)
         .expect("TODO: panic message"); // read the user input
 
+
+
     let modulo: usize = {
         match input_buffer.trim().parse::<usize>() {
             Ok(num) => num,
             Err(_) => 2,
         }
     }; // number to modulo by to keep a lines
+
+    println!("Do you want to deduplicate the csv file(y/n)?");
+    stdin().read_line(&mut input_buffer).expect("TODO: panic message");
+    let mut dedupe: bool = {
+        input_buffer.trim().to_lowercase().contains("y")
+    }; // TODO: allow the user to deduplicate and decimate the file
 
     let path = Path::new(file_path); // create a path for the file that was dragged in so we can later read the file.
 
@@ -48,7 +56,20 @@ fn main() {
         .map(|(_, line_string)| *line_string) // at this point the iter is full of (usize index, &&str line), this maps it into just &str, keeping each reference happy :)
         .collect();
 
-    println!("New line count: {}", new_lines.len()); // print out the line count of the new file
+    let mut dedupe_new_lines: Vec<&str> = new_lines.clone();
+    dedupe_new_lines.dedup_by_key(|line| {
+        let mut split_line = line.split(",").into_iter().peekable();
+        split_line.next();
+        let mut output = String::new();
+        loop {
+            if split_line.peek().is_none() || split_line.peek().is_none() { break; }
+            output = format!("{},{}",output,split_line.next().unwrap());
+        };
+        output
+    });
+
+
+
 
     let new_file_name = format!(
         "./decimated_{}",
@@ -59,27 +80,52 @@ fn main() {
 
     let mut new_file = File::create(new_file_path).unwrap(); // create the new file
 
-    for line in new_lines {
-        match new_file.write_all(line.as_bytes()) {
-            Ok(_) => {}
-            Err(err) => {
-                panic!(
-                    "Error writing line as bytes to file, line:{}, error: {}",
-                    line, err
-                );
-            }
-        }; // append a line as bytes, panic the program if we fail to append it, we dont want to exit with a success for the program if the file output may be bad.
-        match new_file.write_all("\n".as_bytes()) {
-            Ok(_) => {}
-            Err(err) => {
-                panic!(
-                    "Error writing line as bytes to file, line: \\n, error: {}",
-                    err
-                );
-            }
-        }; // append a "\n" after each line so we keep each line on its own line.
-    } // write each line in the new_lines to the new file
-
+    if dedupe {
+        println!("Dedupe line count: {}", dedupe_new_lines.len());
+        for line in dedupe_new_lines {
+            match new_file.write_all(line.as_bytes()) {
+                Ok(_) => {}
+                Err(err) => {
+                    panic!(
+                        "Error writing line as bytes to file, line:{}, error: {}",
+                        line, err
+                    );
+                }
+            }; // append a line as bytes, panic the program if we fail to append it, we dont want to exit with a success for the program if the file output may be bad.
+            match new_file.write_all("\n".as_bytes()) {
+                Ok(_) => {}
+                Err(err) => {
+                    panic!(
+                        "Error writing line as bytes to file, line: \\n, error: {}",
+                        err
+                    );
+                }
+            }; // append a "\n" after each line so we keep each line on its own line.
+        } // write each line in the new_lines to the new file
+    }
+    else {
+        println!("New line count: {}", new_lines.len()); // print out the line count of the new file
+        for line in new_lines {
+            match new_file.write_all(line.as_bytes()) {
+                Ok(_) => {}
+                Err(err) => {
+                    panic!(
+                        "Error writing line as bytes to file, line:{}, error: {}",
+                        line, err
+                    );
+                }
+            }; // append a line as bytes, panic the program if we fail to append it, we dont want to exit with a success for the program if the file output may be bad.
+            match new_file.write_all("\n".as_bytes()) {
+                Ok(_) => {}
+                Err(err) => {
+                    panic!(
+                        "Error writing line as bytes to file, line: \\n, error: {}",
+                        err
+                    );
+                }
+            }; // append a "\n" after each line so we keep each line on its own line.
+        } // write each line in the new_lines to the new file
+    }
     let _ = new_file.flush(); // flush the file from the buffer to the system
 
     println!("Press enter to close program.");
