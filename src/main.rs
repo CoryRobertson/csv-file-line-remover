@@ -21,12 +21,7 @@ fn main() {
         .read_line(&mut input_buffer)
         .expect("TODO: panic message"); // read the user input
 
-    let modulo: usize = {
-        match input_buffer.trim().parse::<usize>() {
-            Ok(num) => num,
-            Err(_) => 1,
-        }
-    }; // number to modulo by to keep a lines
+    let modulo: usize = { input_buffer.trim().parse::<usize>().unwrap_or(1) }; // number to modulo by to keep a lines
 
     println!("Do you want to deduplicate the csv file(y/n)?");
     println!("Doing so will only deduplicate, not modulo the line count.");
@@ -35,7 +30,7 @@ fn main() {
         .read_line(&mut input_buffer)
         .expect("TODO: panic message");
 
-    let dedupe: bool = { input_buffer.trim().to_lowercase().contains("y") }; // TODO: allow the user to deduplicate and decimate the file
+    let dedupe: bool = { input_buffer.trim().to_lowercase().contains('y') }; // TODO: allow the user to deduplicate and decimate the file
 
     let path = Path::new(file_path); // create a path for the file that was dragged in so we can later read the file.
 
@@ -46,7 +41,7 @@ fn main() {
         }
     }; // read the file into one single massive string
 
-    let lines: Vec<&str> = file.split("\n").collect(); // collect all the lines split by a newline into a vector of string slices
+    let lines: Vec<&str> = file.split('\n').collect(); // collect all the lines split by a newline into a vector of string slices
 
     println!("Old line count: {}", lines.len()); // print out the line count of the original file
 
@@ -72,7 +67,7 @@ fn main() {
         let old_line_count = lines.len();
         let mut dedupe_new_lines: Vec<&str> = lines;
         dedupe_new_lines.dedup_by_key(|line| {
-            let mut split_line = line.split(",").into_iter().peekable();
+            let mut split_line = line.split(',').into_iter().peekable();
             split_line.next();
             let mut output = String::new();
             loop {
@@ -86,7 +81,7 @@ fn main() {
         println!("Dedupe line count: {}", dedupe_new_lines.len());
         println!(
             "Dedupe line count change: {}",
-            (old_line_count - dedupe_new_lines.len()) as i64 * -1
+            -((old_line_count - dedupe_new_lines.len()) as i64)
         );
         for line in dedupe_new_lines {
             match new_file.write_all(line.as_bytes()) {
@@ -123,7 +118,7 @@ fn main() {
         println!("New line count: {}", new_lines.len()); // print out the line count of the new file
         println!(
             "Line count change: {}",
-            (lines.len() - new_lines.len()) as i64 * -1
+            -((lines.len() - new_lines.len()) as i64)
         );
         let percent_change = (new_lines.len() as f32 / lines.len() as f32) * 100.0;
         println!("Line percentage change: {:.2}%", percent_change);
