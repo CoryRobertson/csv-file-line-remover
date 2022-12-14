@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/csv-file-line-remover.iml" filepath="$PROJECT_DIR$/csv-file-line-remover.iml" />
+      <module fileurl="file://$PROJECT_DIR$/csv-cleaner.iml" filepath="$PROJECT_DIR$/csv-cleaner.iml" />
     </modules>
   </component>
 </project>

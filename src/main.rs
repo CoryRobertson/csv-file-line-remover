@@ -14,25 +14,23 @@ fn main() {
     }; // find the file that was dragged into the program as input
 
     let mut input_buffer = String::new(); // create an input buffer for the user to type in the divisor
-    println!("Enter divisor to remove from csv file (leave blank for default(2) ): ");
+    println!("Enter divisor to remove from csv file (leave blank for default(1) ): ");
     stdin()
         .read_line(&mut input_buffer)
         .expect("TODO: panic message"); // read the user input
 
-
-
     let modulo: usize = {
         match input_buffer.trim().parse::<usize>() {
             Ok(num) => num,
-            Err(_) => 2,
+            Err(_) => 1,
         }
     }; // number to modulo by to keep a lines
 
     println!("Do you want to deduplicate the csv file(y/n)?");
-    stdin().read_line(&mut input_buffer).expect("TODO: panic message");
-    let mut dedupe: bool = {
-        input_buffer.trim().to_lowercase().contains("y")
-    }; // TODO: allow the user to deduplicate and decimate the file
+    stdin()
+        .read_line(&mut input_buffer)
+        .expect("TODO: panic message");
+    let dedupe: bool = { input_buffer.trim().to_lowercase().contains("y") }; // TODO: allow the user to deduplicate and decimate the file
 
     let path = Path::new(file_path); // create a path for the file that was dragged in so we can later read the file.
 
@@ -60,21 +58,33 @@ fn main() {
     dedupe_new_lines.dedup_by_key(|line| {
         let mut split_line = line.split(",").into_iter().peekable();
         split_line.next();
-        let mut output = String::new();
+        //let mut output = String::new();
+        let mut data_vec = vec![];
         loop {
-            if split_line.peek().is_none() || split_line.peek().is_none() { break; }
-            output = format!("{},{}",output,split_line.next().unwrap());
-        };
-        output
+            if split_line.peek().is_none() || split_line.peek().is_none() {
+                break;
+            }
+            //output = format!("{},{}",output,split_line.next().unwrap());
+            // let temp = split_line.next().unwrap();
+            data_vec.push(split_line.next().unwrap().trim());
+        }
+        println!("Line key: {:?}", data_vec);
+        data_vec
     });
 
-
-
-
-    let new_file_name = format!(
-        "./decimated_{}",
-        path.file_name().unwrap().to_str().unwrap()
-    ); // create the new file name with the word decimated_ prepended to it
+    let new_file_name: String = {
+        if !dedupe {
+            format!(
+                "./decimated_{}",
+                path.file_name().unwrap().to_str().unwrap()
+            )
+        } else {
+            format!(
+                "./deduplicated_{}",
+                path.file_name().unwrap().to_str().unwrap()
+            )
+        }
+    }; // create the new file name with the word decimated_ prepended to it
 
     let new_file_path = Path::new(&new_file_name); // create a new path to that file name
 
@@ -82,6 +92,10 @@ fn main() {
 
     if dedupe {
         println!("Dedupe line count: {}", dedupe_new_lines.len());
+        println!(
+            "Dedupe line count change: {}",
+            (lines.len() - dedupe_new_lines.len()) as i64 * -1
+        );
         for line in dedupe_new_lines {
             match new_file.write_all(line.as_bytes()) {
                 Ok(_) => {}
@@ -102,8 +116,7 @@ fn main() {
                 }
             }; // append a "\n" after each line so we keep each line on its own line.
         } // write each line in the new_lines to the new file
-    }
-    else {
+    } else {
         println!("New line count: {}", new_lines.len()); // print out the line count of the new file
         for line in new_lines {
             match new_file.write_all(line.as_bytes()) {

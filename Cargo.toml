@@ -1,5 +1,5 @@
 [package]
-name = "csv-file-line-remover"
+name = "csv-cleaner"
 version = "0.1.0"
 edition = "2021"
 
