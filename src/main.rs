@@ -50,8 +50,8 @@ fn main() {
             Some(path) => path,
         }
         .to_string(),
-        program_direction: direction_from_string(args.get(2).unwrap())
-            .expect("TODO: panic message"),
+        program_direction: direction_from_string(args.get(2).expect("Error looking for input arguments for program direction, try running program with -m, -d, -md, -dm after file name."))
+            .expect("Error parsing program direction argument, try running program with -m, -d, -md, -dm after file name."),
         modulo: args
             .get(3)
             .unwrap_or(&"".to_string())
@@ -104,7 +104,7 @@ fn main() {
 
     let new_file_path = Path::new(&new_file_name); // create a new path to that file name
 
-    let mut new_file = File::create(new_file_path).unwrap(); // create the new file
+    let mut new_file = File::create(new_file_path).expect("Unable to create new file, missing permissions possibly?"); // create the new file
 
     let new_file_line_count = match program_option.program_direction {
         Mod => {
