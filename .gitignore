@@ -100,3 +100,5 @@ fabric.properties
 /deduplicated_test.csv
 /env_log.csv
 /decimated_env_log.csv
+/deduplicated_decimated_test.csv
+/decimated_deduplicated_test.csv
