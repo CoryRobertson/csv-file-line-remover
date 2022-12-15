@@ -106,28 +106,26 @@ fn main() {
 
     let mut new_file = File::create(new_file_path).unwrap(); // create the new file
 
-    let new_file_line_count: usize;
-
-    match program_option.program_direction {
+    let new_file_line_count = match program_option.program_direction {
         Mod => {
             println!("Mod");
-            new_file_line_count = modulo_line_count(&mut new_file, &lines, program_option.modulo);
+            modulo_line_count(&mut new_file, &lines, program_option.modulo)
         }
         Dedupe => {
             println!("Dedupe");
-            new_file_line_count = dedupe_file(&mut new_file, &lines);
+            dedupe_file(&mut new_file, &lines)
         }
         ModDedupe => {
             println!("ModDedupe");
             modulo_line_count(&mut new_file, &lines, program_option.modulo);
-            new_file_line_count = dedupe_file(&mut new_file, &lines);
+            dedupe_file(&mut new_file, &lines)
         }
         DedupeMod => {
             println!("DedupeMod");
             dedupe_file(&mut new_file, &lines);
-            new_file_line_count = modulo_line_count(&mut new_file, &lines, program_option.modulo);
+            modulo_line_count(&mut new_file, &lines, program_option.modulo)
         }
-    }
+    };
 
     println!(
         "Total line change amount: {}",
