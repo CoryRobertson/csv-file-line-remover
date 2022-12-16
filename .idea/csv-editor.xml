@@ -3,7 +3,7 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
-        <entry key="\decimated_deduplicated_test.csv">
+        <entry key="\decimated_deduplicated_env_log.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />
@@ -11,13 +11,6 @@
           </value>
         </entry>
         <entry key="\decimated_test.csv">
-          <value>
-            <Attribute>
-              <option name="separator" value="," />
-            </Attribute>
-          </value>
-        </entry>
-        <entry key="\deduplicated_env_log.csv">
           <value>
             <Attribute>
               <option name="separator" value="," />

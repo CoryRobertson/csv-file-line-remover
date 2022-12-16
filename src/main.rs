@@ -2,6 +2,7 @@ use crate::ProgramDirection::{Dedupe, DedupeMod, Mod, ModDedupe};
 use std::fs::File;
 use std::io::{stdin, Write};
 use std::path::Path;
+use std::time::SystemTime;
 use std::{env, fs};
 
 static MOD_ARG: &str = "-m";
@@ -43,7 +44,7 @@ fn main() {
     let program_option: ProgramOptions = {
         // .expect("Error looking for input arguments for program direction, try running program with -m, -d, -md, -dm after file name.")
         let program_direction = match direction_from_string(args.get(2).unwrap_or(&"".to_string())) {
-            Ok(dir) => {dir}
+            Ok(dir) => dir,
             Err(_) => {
                 let mut input_buffer = String::new();
                 loop {
@@ -86,19 +87,25 @@ fn main() {
                 } else {
                     let mut input_buffer = String::new();
                     loop {
-                        if program_direction == Dedupe { break 1; }
+                        if program_direction == Dedupe {
+                            break 1;
+                        }
                         println!("Input a modulo to use for line removal(empty for default of 1):");
 
                         let _ = stdin().read_line(&mut input_buffer);
                         if let Ok(dir) = input_buffer.trim().parse::<usize>() {
                             break dir;
                         }
-                        if input_buffer.trim().is_empty() { break 1; }
+                        if input_buffer.trim().is_empty() {
+                            break 1;
+                        }
                     }
                 }
             },
         }
-    }; // args are as follows: "<filename> <ProgramDirection> <OPTIONAL modulo>"
+    }; // args are as follows: "<File name> <Program direction> <OPTIONAL modulo>"
+
+    let start_time = SystemTime::now();
 
     let path = Path::new(&program_option.file_path); // create a path for the file that was dragged in so we can later read the file.
 
@@ -109,7 +116,13 @@ fn main() {
         }
     }; // read the file into one single massive string
 
-    let lines: Vec<&str> = file.split('\n').collect(); // collect all the lines split by a newline into a vector of string slices
+    let mut lines: Vec<&str> = file.split('\n')
+        .filter_map(|line| {
+            if line.trim().is_empty() { None } else { Some(line.trim()) } // filter map that cleans empty lines out of the line file
+        })
+        .collect(); // collect all the lines split by a newline into a vector of string slices
+
+    let original_line_count = lines.len();
 
     println!("Old line count: {}", lines.len()); // print out the line count of the original file
 
@@ -144,52 +157,60 @@ fn main() {
 
     let new_file_path = Path::new(&new_file_name); // create a new path to that file name
 
-    let mut new_file = File::create(new_file_path).expect("Unable to create new file, missing permissions possibly?"); // create the new file
+    let mut new_file = File::create(new_file_path)
+        .expect("Unable to create new file, missing permissions possibly?"); // create the new file
 
-    // FIXME: currently running two in of the functions one after another seems to not sync the file data correctly. Maybe move to holding the file in a massive string?
     let new_file_line_count = match program_option.program_direction {
         Mod => {
-            println!("Mod");
-            modulo_line_count(&mut new_file, &lines, program_option.modulo)
+            println!("Mod option");
+            modulo_line_count(&mut new_file, &mut lines, program_option.modulo)
         }
         Dedupe => {
-            println!("Dedupe");
-            dedupe_file(&mut new_file, &lines)
+            println!("Dedupe option");
+            dedupe_file(&mut new_file, &mut lines)
         }
         ModDedupe => {
-            println!("ModDedupe");
-            let intermediary_line_count = modulo_line_count(&mut new_file, &lines, program_option.modulo);
-            println!("Intermediary line count after modulo: {}", intermediary_line_count);
-            let _ = new_file.sync_all();
-            let _ = new_file.flush();
-            let _ = new_file.sync_all(); // these dont seem to work, going to do further testing on another platform.
-            dedupe_file(&mut new_file, &lines)
+            println!("ModDedupe option");
+            let intermediary_line_count =
+                modulo_line_count(&mut new_file, &mut lines, program_option.modulo);
+            println!(
+                "Intermediary line count after modulo: {}",
+                intermediary_line_count
+            );
+            dedupe_file(&mut new_file, &mut lines)
         }
         DedupeMod => {
-            println!("DedupeMod");
-            let intermediary_line_count = dedupe_file(&mut new_file, &lines);
-            println!("Intermediary line count after dedupe: {}", intermediary_line_count);
-            let _ = new_file.sync_all();
-            let _ = new_file.flush();
-            let _ = new_file.sync_all(); // these dont seem to work, going to do further testing on another platform.
-            modulo_line_count(&mut new_file, &lines, program_option.modulo)
+            println!("DedupeMod option");
+            let intermediary_line_count = dedupe_file(&mut new_file, &mut lines);
+            println!(
+                "Intermediary line count after dedupe: {}",
+                intermediary_line_count
+            );
+            modulo_line_count(&mut new_file, &mut lines, program_option.modulo)
         }
     };
 
     println!(
         "Total line change amount: {}",
-        lines.len() - new_file_line_count
+        original_line_count - new_file_line_count
     );
-    let percent_change = (new_file_line_count as f32 / lines.len() as f32) * 100.0;
+
+    let percent_change = (new_file_line_count as f32 / original_line_count as f32) * 100.0;
     println!("Total line percentage change: {:.2}%", percent_change);
     println!("New line count: {}", new_file_line_count);
 
     let _ = new_file.flush(); // flush the file from the buffer to the system
+    let end_time = SystemTime::now();
+    let time_elapsed = end_time.duration_since(start_time).unwrap();
+    println!(
+        "Program executed in {:.4} seconds",
+        time_elapsed.as_secs_f64()
+    );
 }
 
-fn modulo_line_count(new_file: &mut File, lines: &Vec<&str>, modulo: usize) -> usize {
+fn modulo_line_count(new_file: &mut File, lines: &mut Vec<&str>, modulo: usize) -> usize {
     // else, user decided to modulo the file line-count
-    let new_lines: Vec<&str> = lines
+    *lines = lines
         .iter() // create an iterator of the lines
         .enumerate() // turn the iterator into a list of &str into a list of (index, &str) tuples
         .filter(|(index, _)| index % modulo == 0) // apply modulo filter, if index % modulo == 0, keep the line, if not remove it.
@@ -198,7 +219,7 @@ fn modulo_line_count(new_file: &mut File, lines: &Vec<&str>, modulo: usize) -> u
 
     println!("Modulo: {}", modulo); // print out the modulo from the user input so they can verify it.
 
-    for line in &new_lines {
+    for line in lines.iter() {
         match new_file.write_all(line.as_bytes()) {
             Ok(_) => {}
             Err(err) => {
@@ -219,13 +240,14 @@ fn modulo_line_count(new_file: &mut File, lines: &Vec<&str>, modulo: usize) -> u
             }
         }; // append a "\n" after each line so we keep each line on its own line.
     } // write each line in the new_lines to the new file
-    new_lines.len()
+      // *lines = new_lines;
+    lines.len()
 }
 
-fn dedupe_file(new_file: &mut File, lines: &Vec<&str>) -> usize {
-    let mut dedupe_new_lines: Vec<&str> = lines.clone();
+fn dedupe_file(new_file: &mut File, lines: &mut Vec<&str>) -> usize {
+    //let mut dedupe_new_lines: Vec<&str> = lines.clone();
 
-    dedupe_new_lines.dedup_by_key(|line| {
+    lines.dedup_by_key(|line| {
         let mut split_line = line.split(',').into_iter().peekable();
         split_line.next();
         let mut output = String::new();
@@ -238,7 +260,7 @@ fn dedupe_file(new_file: &mut File, lines: &Vec<&str>) -> usize {
         output
     });
 
-    for line in &dedupe_new_lines {
+    for line in lines.iter() {
         match new_file.write_all(line.as_bytes()) {
             Ok(_) => {}
             Err(err) => {
@@ -258,5 +280,6 @@ fn dedupe_file(new_file: &mut File, lines: &Vec<&str>) -> usize {
             }
         }; // append a "\n" after each line so we keep each line on its own line.
     } // write each line in the new_lines to the new file
-    dedupe_new_lines.len()
+      // *lines = new_lines;
+    lines.len()
 }
