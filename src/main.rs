@@ -1,6 +1,6 @@
 use crate::ProgramDirection::{Dedupe, DedupeMod, Mod, ModDedupe};
 use std::fs::File;
-use std::io::Write;
+use std::io::{stdin, Write};
 use std::path::Path;
 use std::{env, fs};
 
@@ -9,7 +9,7 @@ static DEDUPE_ARG: &str = "-d";
 static MOD_DEDUPE_ARG: &str = "-md";
 static DEDUPE_MOD_ARG: &str = "-dm";
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Clone)]
 enum ProgramDirection {
     Mod,
     Dedupe,
@@ -38,26 +38,66 @@ struct ProgramOptions {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect(); // TODO: eventually stray away from using environment args and stdin, and just use env args entirely.
+    let args: Vec<String> = env::args().collect();
 
-    let program_option = ProgramOptions {
-        file_path: match args.get(1) {
-            None => {
-                panic!(
-                    "Missing csv file, try running program with argument of a filename that exists."
-                );
+    let program_option: ProgramOptions = {
+        // .expect("Error looking for input arguments for program direction, try running program with -m, -d, -md, -dm after file name.")
+        let program_direction = match direction_from_string(args.get(2).unwrap_or(&"".to_string())) {
+            Ok(dir) => {dir}
+            Err(_) => {
+                let mut input_buffer = String::new();
+                loop {
+                    println!("Input a valid program direction (-m, -d, -md, -dm):");
+                    println!("-m modulo lines");
+                    println!("-d deduplicate lines");
+                    println!("-md modulo lines, then deduplicate lines");
+                    println!("-dm deduplicate lines, then modulo lines");
+                    let _ = stdin().read_line(&mut input_buffer);
+                    if let Ok(dir) = direction_from_string(&input_buffer.trim().to_string()) {
+                        break dir;
+                    }
+                }
             }
-            Some(path) => path,
+        };
+        ProgramOptions {
+            file_path: {
+                match args.get(1) {
+                    None => {
+                        let mut input_buffer = String::new();
+                        println!("Missing csv file, input a file name for the program to use:");
+                        let _ = stdin().read_line(&mut input_buffer);
+                        input_buffer.trim().to_string()
+                        // panic!(
+                        //     "Missing csv file, try running program with argument of a filename that exists."
+                        // );
+                    }
+                    Some(path) => path.to_string(),
+                }
+            },
+            program_direction: program_direction.clone(),
+            modulo: {
+                let modulo_input = args
+                    .get(3)
+                    .unwrap_or(&"".to_string())
+                    .trim()
+                    .parse::<usize>();
+                if let Ok(modu) = modulo_input {
+                    modu
+                } else {
+                    let mut input_buffer = String::new();
+                    loop {
+                        if program_direction == Dedupe { break 1; }
+                        println!("Input a modulo to use for line removal(empty for default of 1):");
+
+                        let _ = stdin().read_line(&mut input_buffer);
+                        if let Ok(dir) = input_buffer.trim().parse::<usize>() {
+                            break dir;
+                        }
+                        if input_buffer.trim().is_empty() { break 1; }
+                    }
+                }
+            },
         }
-        .to_string(),
-        program_direction: direction_from_string(args.get(2).expect("Error looking for input arguments for program direction, try running program with -m, -d, -md, -dm after file name."))
-            .expect("Error parsing program direction argument, try running program with -m, -d, -md, -dm after file name."),
-        modulo: args
-            .get(3)
-            .unwrap_or(&"".to_string())
-            .trim()
-            .parse::<usize>()
-            .unwrap_or(1),
     }; // args are as follows: "<filename> <ProgramDirection> <OPTIONAL modulo>"
 
     let path = Path::new(&program_option.file_path); // create a path for the file that was dragged in so we can later read the file.
@@ -106,6 +146,7 @@ fn main() {
 
     let mut new_file = File::create(new_file_path).expect("Unable to create new file, missing permissions possibly?"); // create the new file
 
+    // FIXME: currently running two in of the functions one after another seems to not sync the file data correctly. Maybe move to holding the file in a massive string?
     let new_file_line_count = match program_option.program_direction {
         Mod => {
             println!("Mod");
@@ -117,12 +158,20 @@ fn main() {
         }
         ModDedupe => {
             println!("ModDedupe");
-            modulo_line_count(&mut new_file, &lines, program_option.modulo);
+            let intermediary_line_count = modulo_line_count(&mut new_file, &lines, program_option.modulo);
+            println!("Intermediary line count after modulo: {}", intermediary_line_count);
+            let _ = new_file.sync_all();
+            let _ = new_file.flush();
+            let _ = new_file.sync_all(); // these dont seem to work, going to do further testing on another platform.
             dedupe_file(&mut new_file, &lines)
         }
         DedupeMod => {
             println!("DedupeMod");
-            dedupe_file(&mut new_file, &lines);
+            let intermediary_line_count = dedupe_file(&mut new_file, &lines);
+            println!("Intermediary line count after dedupe: {}", intermediary_line_count);
+            let _ = new_file.sync_all();
+            let _ = new_file.flush();
+            let _ = new_file.sync_all(); // these dont seem to work, going to do further testing on another platform.
             modulo_line_count(&mut new_file, &lines, program_option.modulo)
         }
     };
